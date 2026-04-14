@@ -1,6 +1,6 @@
 import * as services from '../services/user.services.js'
 
-export async function register(req, res){
+export async function register(req, res, next){
     try {
         const {name, email, password} = req.body;
 
@@ -15,14 +15,12 @@ export async function register(req, res){
         data: user
        })
     }catch (err) {
-        res.status(err.status || 500).json({
-            error: err.message || "Erro no servidor"
-        });
+        next(err)
     }
 }
 
 
-export async function login(req, res) {
+export async function login(req, res, next) {
     try {
         const {email, password} = req.body
 
@@ -31,9 +29,7 @@ export async function login(req, res) {
         return res.status(200).json(userToken)
         
     }catch (err) {
-        return res.status(err.status || 500).json({
-            error: err.message || "Erro no servidor"
-        })
+        next(err)
     }
 }
 

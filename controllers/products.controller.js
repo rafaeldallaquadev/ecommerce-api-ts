@@ -1,6 +1,6 @@
 import * as services from '../services/products.services.js'
 
-export async function newProduct(req, res) {
+export async function newProduct(req, res, next) {
     try {
         const {name, price, stock} = req.body
         const userId = req.user.id
@@ -13,13 +13,12 @@ export async function newProduct(req, res) {
             data: product
         });
     } catch (err) {
-        console.log(err);
-        return res.status(500).json({error: "Não foi possível cadastrar produto"})
+        next(err)
     }
 }
 
 
-export async function updateProduct (req, res) {
+export async function updateProduct (req, res, next) {
     try {
 
         const id = req.params.id;
@@ -33,12 +32,11 @@ export async function updateProduct (req, res) {
         });
 
     } catch (err) {
-        return res.status(err.status || 500).json({
-            error: err.message || "Erro no servidor"})
+        next(err)
     }
 }
 
-export async function deleteProduct(req, res) {
+export async function deleteProduct(req, res, next) {
     try {
         const id = req.params.id
         const userId = req.user.id
@@ -50,13 +48,11 @@ export async function deleteProduct(req, res) {
         })
         
     } catch (err) {
-        return res.status(err.status || 500).json({
-            error: err.message || "Erro no servidor"
-        })
+        next(err)
     }
 }
 
-export async function listProducts(req, res) {
+export async function listProducts(req, res, next) {
     try {
         const {
             name = '',
@@ -74,19 +70,17 @@ export async function listProducts(req, res) {
 
         return res.status(200).json(products);
     } catch (err) {
-        return res.status(err.status || 500).json({error: err.message || "Erro no servidor"})
+        next(err)
     }
 }
 
-export async function getProduct(req, res) {
+export async function getProduct(req, res, next) {
     try {
         const id = req.params.id
         const product = await services.productByID(id);
 
         return res.status(200).json(product);
     } catch (err) {
-        return res.status(err.status || 500).json({
-            error: err.message || "Erro no servidor"
-        })
+        next(err)
     }
 }

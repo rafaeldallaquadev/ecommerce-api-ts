@@ -1,6 +1,6 @@
 import * as services from '../services/wishlist.services.js'
 
-export async function getWishlist(req, res) {
+export async function getWishlist(req, res, next) {
     try {
         const {
             minPrice = 0,
@@ -18,12 +18,12 @@ export async function getWishlist(req, res) {
     
         return res.status(200).json(products);
     } catch (err) {
-        return res.status(err.status || 500).json({error: err.message || "Erro no servidor"})
+        next(err)
     }
 }
 
 
-export async function postWishlist(req, res) {
+export async function postWishlist(req, res, next) {
     try {
         const userId = req.user.id;
         const productId = req.params.productId;
@@ -37,14 +37,12 @@ export async function postWishlist(req, res) {
         })
         
     } catch (err) {
-        res.status(err.status || 500).json({
-            error: err.message || "Erro no servidor"
-        })
+        next(err)
     }
 
 }
 
-export async function delWishlist(req, res) {
+export async function delWishlist(req, res, next) {
     try {
         const userId = req.user.id;
         const productId = req.params.productId;
@@ -56,6 +54,6 @@ export async function delWishlist(req, res) {
             data: deleted
         })
     } catch (err) {
-        res.status(err.status || 500).json({error: err.message || "Erro no servidor"})
+        next(err)
     }
 }

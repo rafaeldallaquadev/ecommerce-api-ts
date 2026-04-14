@@ -13,7 +13,7 @@ export async function getCart (req, res) {
     }
 }
 
-export async function addToCart(req, res) {
+export async function addToCart(req, res, next) {
     try {
         const userId = req.user.id;
         const productId = req.params.product_id
@@ -26,11 +26,11 @@ export async function addToCart(req, res) {
         })
 
     } catch (err) {
-        return res.status(err.status || 500).json({error: err.message || "Erro no servidor"})
+        next(err)
     }
 }
 
-export async function updateQuantity(req, res) {
+export async function updateQuantity(req, res, next) {
     try {
         const userId = req.user.id
         const productId = req.params.product_id
@@ -45,13 +45,11 @@ export async function updateQuantity(req, res) {
 
         
     } catch (err) {
-        res.status(err.status || 500).json({
-            error: err.message || "Erro no servidor"
-        })
+        next(err)
     }
 }
 
-export async function removeFromCart(req, res) {
+export async function removeFromCart(req, res, next) {
     try {
         const userId = req.user.id
         const productId = req.params.product_id
@@ -63,22 +61,17 @@ export async function removeFromCart(req, res) {
             data: removed
         })
     } catch (err) {
-        res.status(err.status || 500).json({
-            error: err.message || "Erro no servidor"
-        })
+        next(err)
     }
 }
 
-export async function checkout(req, res) {
+export async function checkout(req, res, next) {
     try {
         const userId = req.user.id
         const purchase = await services.completePurchase(userId)
 
         res.status(200).json(purchase)
     } catch (err) {
-        console.log(err)
-        res.status(err.status || 500).json({
-            error: err.message || "Erro no servidor"
-        })
+        next(err)
     }
 }
