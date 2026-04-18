@@ -1,8 +1,30 @@
-import {pool} from '../db.js'
+//src/services/cart.services.ts
 
-export async function cartList(userId) {
+import type { ResultSetHeader } from 'mysql2'
+import {pool} from '../db.js'
+import { AppError } from '../error/AppError.js'
+import type { 
+    AddToCartDTO, 
+    Cart, 
+    DeletedProduct, 
+    NewCartProduct, 
+    Purchase, 
+    RemoveFromCartDTO, 
+    UpdateCartDTO, 
+    UpdatedProduct} from '../types/cart.types.js'
+import type{
+    OrderRow, 
+    StockRow, 
+    CartItemsRow , 
+    CartProductsRow, 
+    UserCartRow } from '../types/mysql.types.js'
+import type { UserId } from '../types/user.types.js'
+
+
+export async function cartList(data: UserId): Promise<Cart> {
+    const {id} = data
     try {
-        const [rows] = await pool.execute(
+        const [rows] = await pool.execute<CartProductsRow[]>(
             `select 
                 p.id, 
                 p.name, 
@@ -13,58 +35,58 @@ export async function cartList(userId) {
             JOIN products p ON p.id = ci.product_id
             WHERE c.user_id = ?
             AND c.status = "active" `,
-            [userId])
+            [id])
     
         if (rows.length === 0) {
-            const error = new Error("Carrinho vazio")
-            error.status = 404
-            throw error
+            throw new AppError("Carrinho vazio", 404);
         }
+        const cart = rows
     
-        return rows
+        return cart
         
     } catch (err) {
-        throw err
+        if (err instanceof AppError){
+            throw err
+        }
+        throw new AppError("Carrinho inexistente", 404)
     }   
 }
 
-export async function addingProduct(userId, productId, quantity) {
+export async function addingProduct(data: AddToCartDTO): Promise<NewCartProduct> {
+    const {userId, productId, quantity} = data
     try {
         const parsedProductId = Number(productId);
         const parsedQuantity = Number(quantity)
 
         if (isNaN(parsedProductId)){
-                const error = new Error("ID de produto inválido")
-                error.status = 400
-                throw error
+                throw new AppError("ID de produto inválido", 400)
             }
             
         if (isNaN(parsedQuantity) || parsedQuantity <= 0){
-            const error = new Error("Quantidade inválida")
-            error.status = 400
-            console.log(parsedQuantity, typeof parsedQuantity)
-            throw error
+            throw new AppError("Quantidade inválida", 400)
         }
         
-        const [cart] = await pool.execute(
-            `SELECT * FROM cart WHERE user_id = ? AND status = "active" LIMIT 1`,
+        const [cart] = await pool.execute<UserCartRow[]>(
+            `SELECT id, user_id FROM cart WHERE user_id = ? AND status = "active" LIMIT 1`,
             [userId]
         );
         
         let cartId
+
+        const activeCart = cart[0]
     
-        if (cart.length === 0) {
-            const [newCart] = await pool.execute(
+        if (!activeCart) {
+            const [newCart] = await pool.execute<ResultSetHeader>(
                 `INSERT INTO cart (user_id, status) VALUES (?, "active")`,
                 [userId]
             );
             
             cartId = newCart.insertId;
         } else {
-            cartId = cart[0].id
+            cartId = activeCart.id
         }
     
-        const [existingItem] = await pool.execute(
+        const [existingItem] = await pool.execute<CartItemsRow[]>(
             `select * from cart_items where cart_id = ? and product_id = ?`,
             [cartId, parsedProductId]
         )
@@ -82,51 +104,53 @@ export async function addingProduct(userId, productId, quantity) {
                 }
                 
             return {
-                cart_id: cartId,
-                product_id: parsedProductId,
+                cartId: cartId,
+                productId: parsedProductId,
                 quantity: parsedQuantity
             }    
     } catch (err) {
-        if (err.code === "ER_NO_REFERENCED_ROW_2"){
-            const error = new Error("Produto não encontrado")
-            error.status = 404
-            throw error
+        if (err instanceof AppError){
+            throw err
         }
-        throw err
+        const dbError = err as {code?: string}
+        if (dbError.code === "ER_NO_REFERENCED_ROW_2"){
+            throw new AppError("Produto não encontrado", 404)
+        }
+        throw new AppError("Erro interno", 500)
     }
 }
 
-export async function putNewQuantity(userId, productId, quantity){
+export async function putNewQuantity(data: UpdateCartDTO): Promise<UpdatedProduct> {
+    const {userId, productId, quantity} = data
     try {
         const parsedProductId = Number(productId)
         const parsedQuantity = Number(quantity)
 
         console.log(parsedQuantity)
         if (parsedProductId === undefined || isNaN(parsedProductId)) {
-            const error = new Error("ID de produto inválido")
-            error.status = 400
-            throw error
+            throw new AppError("ID de produto inválido", 400)
         }
 
         if (parsedQuantity === undefined || isNaN(parsedQuantity) || parsedQuantity <= 0) {
-            const error = new Error("Quantidade inválida")
-            error.status = 400
-            throw error
+            throw new AppError("Quantidade inválida", 400)
         }
     
-        const [cart] = await pool.execute(
-            `SELECT * FROM cart WHERE user_id = ? AND status = 'active'`,
+        const [cart] = await pool.execute<UserCartRow[]>(
+            `SELECT id, user_id FROM cart WHERE user_id = ? AND status = 'active'`,
             [userId]
         )
+
+        const activeCart = cart[0]
+
+
     
-        if (cart.length === 0) {
-            const error = new Error("Carrinho não encontrado")
-            error.status = 404
-            throw error
+        if (!activeCart) {
+            throw new AppError("Carrinho não encontrado", 404)
         }
         
-        const cartId = cart[0].id
-        const [result] = await pool.execute(
+        const cartId = activeCart.id
+
+        const [result] = await pool.execute<ResultSetHeader>(
             `UPDATE cart_items
             SET quantity = ?
             WHERE product_id = ? AND cart_id = ?`,
@@ -134,13 +158,11 @@ export async function putNewQuantity(userId, productId, quantity){
         )
 
         if (result.affectedRows === 0) {
-            const error = new Error("Produto não está no carrinho")
-            error.status = 404
-            throw error
+            throw new AppError("Produto não está no carrinho", 404)
         }
     
         return {
-            product_id: parsedProductId,
+            productId: parsedProductId,
             quantity: parsedQuantity
         }
     } catch (err) {
@@ -148,53 +170,51 @@ export async function putNewQuantity(userId, productId, quantity){
     }
 }
 
-export async function removeItem(userId, productId){
+export async function removeItem(data: RemoveFromCartDTO): Promise <DeletedProduct> {
+    const {userId, productId} = data
     try {
         const parsedProductId = Number(productId)
 
         if (isNaN(parsedProductId)){
-            const error = new Error("ID de produto inválido")
-            error.status = 400
-            throw error
+            throw new AppError("ID de produto inválido", 400)
         }
     
-        const [cart] = await pool.execute(
-            `select * from cart where user_id = ? AND status = 'active'`,
+        const [cart] = await pool.execute<UserCartRow[]>(
+            `SELECT id, user_id FROM cart WHERE user_id = ? AND status = 'active'`,
             [userId]
         )
+
+        const activeCart = cart[0]
     
-        if (cart.length === 0) {
-            const error = new Error(`Carrinho não encontrado`);
-            error.status = 404
-            throw error
+        if (!activeCart) {
+            throw new AppError(`Carrinho não encontrado`,404);
         }
-        const cartId = cart[0].id;
+        const cartId = activeCart.id;
     
-        const [result] = await pool.execute(
+        const [result] = await pool.execute<ResultSetHeader>(
             `delete from cart_items where cart_id = ? AND product_id = ?`,
             [cartId, parsedProductId]
         )
     
         if (result.affectedRows === 0) {
-            const error = new Error("Produto não se encontra no carrinho");
-            error.status = 404
-            throw error
+            throw new AppError("Produto não se encontra no carrinho", 404);
         }
     
         return {
-            product_id: productId
+            productId: productId
         }
     } catch (err) {
         throw err
     }
 }
 
-export async function completePurchase(userId){
+export async function completePurchase(data: UserId): Promise<Purchase>{
+    const {id} = data
     const connection = await pool.getConnection();
 
     try {
         await connection.beginTransaction();
-        const [cartItems] = await connection.execute(
+        const [cartItems] = await connection.execute<OrderRow[]>(
             `SELECT 
                 p.id,
                 p.name,
@@ -207,16 +227,15 @@ export async function completePurchase(userId){
             WHERE c.user_id = ? 
             AND c.status = 'active'
             FOR UPDATE`,
-            [userId]
+            [id]
         );
 
+
         if (cartItems.length === 0) {
-            const error = new Error("Carrinho vazio");
-            error.status = 404;
-            throw error;
+            throw new AppError("Carrinho vazio", 404);
         }
 
-        const [insufficientStock] = await connection.execute(
+        const [insufficientStock] = await connection.execute<StockRow[]>(
             `
             SELECT p.id
             FROM products p
@@ -226,13 +245,11 @@ export async function completePurchase(userId){
             AND c.status = 'active'
             AND ci.quantity > p.stock
             `,
-            [userId]
+            [id]
         );
 
         if (insufficientStock.length > 0) {
-            const error = new Error("Estoque insuficiente");
-            error.status = 409;
-            throw error;
+            throw new AppError("Estoque insuficiente", 409);
         }
 
         const params = cartItems.map(i => [i.id, i.quantity]);
@@ -255,7 +272,7 @@ export async function completePurchase(userId){
             ...ids
         ];
 
-        await connection.execute(sql, values);
+        await connection.query(sql, values);
 
         
         await connection.execute(
@@ -265,7 +282,7 @@ export async function completePurchase(userId){
             WHERE user_id = ? 
             AND status = 'active'
             `,
-            [userId]
+            [id]
         );
 
         await connection.commit();
@@ -277,7 +294,7 @@ export async function completePurchase(userId){
 
         return {
             message: "Compra efetuada com sucesso",
-            produtos: cartItems,
+            products: cartItems,
             total: finalPrice
         };
 

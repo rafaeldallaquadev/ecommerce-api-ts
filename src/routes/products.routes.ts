@@ -1,4 +1,4 @@
-//routes/products.routes.js
+//./src/routes/products.routes.js
 //===========================
 
 import express from 'express'

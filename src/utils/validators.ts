@@ -1,6 +1,7 @@
+//src/utils/validators.ts
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function isValidEmail(email) {
+export function isValidEmail(email: string) {
   if (!email) return false;
 
   const normalizedEmail = email.trim().toLowerCase();
@@ -18,7 +19,7 @@ export function isValidEmail(email) {
   return true;
 }
 
-export function isValidPassword(password) {
+export function isValidPassword(password:string) {
   if (!password || password.length < 8) return false;
 
   if (!/[a-zA-Z]/.test(password)) return false;
@@ -27,7 +28,7 @@ export function isValidPassword(password) {
   return true;
 }
 
-export function isValidName(name) {
+export function isValidName(name: String) {
   if (!name) return false;
 
   const normalizedName = name.trim();

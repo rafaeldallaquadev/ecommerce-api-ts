@@ -1,6 +1,12 @@
+//./src/middlewares/user.middlewares.ts
+
 import { isValidEmail, isValidPassword, isValidName } from "../utils/validators.js"
+import type { Request, Response, NextFunction } from "express"
+import type { JwtPayload } from "jsonwebtoken"
 import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
+import { AppError } from "../error/AppError.js"
+import type { AuthPayload } from "../types/auth.types.js"
 dotenv.config()
 
 
@@ -11,16 +17,16 @@ if (!JWT_SECRET) {
     throw new Error("JWT_SECRET não definido");
 }
 
-export function validateRegister(req, res, next){
+const jwtSecret = JWT_SECRET
+
+export function validateRegister(req: Request, res: Response, next: NextFunction){
 
     try {
         const {name, email, password} = req.body
         
     
         if(!name || !email || !password) {
-            const error = new Error("Campos obrigatórios")
-            error.status = 400
-            throw error
+            throw new AppError("Campos obrigatórios", 400)
         }
 
         const normalizedEmail = email.trim().toLowerCase()
@@ -30,21 +36,15 @@ export function validateRegister(req, res, next){
         req.body.name = normalizedName;
 
         if(!isValidName(normalizedName)) {
-            const error = new Error("Nome inválido")
-            error.status = 400
-            throw error
+            throw new AppError("Nome inválido", 400)
         }
     
         if(!isValidEmail(normalizedEmail)){
-            const error = new Error("E-mail inválido")
-            error.status = 400
-            throw error
+            throw new AppError("E-mail inválido", 400)
         }
     
         if (!isValidPassword(password)) {
-            const error = new Error("Senha precisa conter pelo menos 8 caracteres, letras e números")
-            error.status = 400
-            throw error
+            throw new AppError("Senha precisa conter pelo menos 8 caracteres, letras e números", 400)
         }
     
         return next()
@@ -55,14 +55,12 @@ export function validateRegister(req, res, next){
 }
 
 
-export function validateLogin(req, res, next){
+export function validateLogin(req: Request, res: Response, next: NextFunction){
     try{
         const {email, password} = req.body
 
         if (!email || !password){
-            const error = new Error("Campos obrigatórios")
-            error.status = 400
-            throw error
+            throw new AppError("Campos obrigatórios", 400)
         }
 
         req.body.email = email.trim().toLowerCase();
@@ -74,36 +72,38 @@ export function validateLogin(req, res, next){
     }
 }
 
-export async function verifyAuth(req, res, next) {
+export async function verifyAuth(req: Request, res: Response, next: NextFunction) {
     try {
         const authHeader = req.headers.authorization;
 
         
         if(!authHeader) {
-            const error = new Error("Token não fornecido")
-            error.status = 401
-            throw error
+            throw new AppError("Token não fornecido", 401)
         }
 
         const parts = authHeader.split(" ");
         if (parts.length !== 2) {
-            const error = new Error("Token mal formatado")
-            error.status = 401
-            throw error
+            throw new AppError("Token mal formatado", 401)
         }
 
         const [scheme, token] = parts;
 
         if (scheme !== "Bearer"){
-            const error = new Error("Formato inválido")
-            error.status = 401
-            throw error
-        } 
+            throw new AppError("Formato inválido", 401)
+        }
+
+        if (!token) {
+            throw new AppError("Formato inválido", 401)
+        }
 
 
-        const decoded = jwt.verify(token, JWT_SECRET)
+        const decoded = jwt.verify(token, jwtSecret)
 
-        req.user = decoded
+        if (typeof decoded === 'string') {
+            throw new AppError("Token inválido", 400)
+        }
+
+        req.user = decoded as AuthPayload
 
         return next()
         

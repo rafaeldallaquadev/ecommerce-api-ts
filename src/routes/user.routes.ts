@@ -1,4 +1,4 @@
-//routes/user.routes.js
+//routes/user.routes.ts
 //======================
 
 import express from 'express';
